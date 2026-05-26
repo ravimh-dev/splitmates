@@ -88,7 +88,7 @@ npm install
 
 - Copy `.env.sample` to `.env`
 - Update database, Redis, JWT, and SMTP values
-- `DB_URL` takes precedence over `DB_HOST`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`
+- Use `DB_URL` for PostgreSQL connection string
 
 ### Initialize Database
 
