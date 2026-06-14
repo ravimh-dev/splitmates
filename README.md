@@ -1,244 +1,138 @@
-# Expense Splitter
+# SplitMates — Shared Expense Manager
 
-Expense Splitter is a backend-first shared-expenses platform for groups that need to track spending, calculate balances, and settle debts with the fewest possible transfers. It combines a modular Node.js/TypeScript backend, PostgreSQL, Redis, and a lightweight EJS demo UI to deliver a practical full-stack workflow.
+SplitMates is a backend-first shared-expenses platform for groups (friends, roommates, teams) that tracks spending, computes balances deterministically, and generates minimal settlement plans so groups settle debts with the fewest transfers.
 
-## Overview
+Quick highlights:
 
-- Track shared expenses across groups of friends, roommates, or teams
-- Compute who owes whom using deterministic balance calculations
-- Generate optimized settlement plans with a heap-based matching algorithm
-- Provide a minimal browser UI for common user flows
-- Expose a documented REST API for frontend and API clients
+- Deterministic balance calculations with small-epsilon handling
+- Heap-based settlement planner with O(n log n) performance
+- Backend-first Node.js + TypeScript API with a lightweight EJS demo UI
 
-## Architecture
+**Project name:** splitmates
 
-The application follows a modular monolith design:
+**Repository status:** production-ready server + demo UI, Jest unit tests
 
-- `src/app.ts` configures Express, security middleware, static assets, routes, and error handling
-- `src/server.ts` (if present) connects PostgreSQL and Redis before starting the server
-- `modules/` contains controller, service, validation, route, and type files for each domain, including auth, users, groups, expenses, and settlements
-- `db/` contains the connection layer, schema setup, and seed data
-- `frontend/` contains the demo UI, browser-side API calls and assets
-- `public/` contains static assets served by Express for the demo UI
-- `views/` contains EJS pages for the demo UI
+**Tech overview**
+
+- Runtime: Node.js 20+
+- Language: TypeScript
+- Web: Express
+- DB: PostgreSQL
+- Cache: Redis
+- Views: EJS (demo)
+- Auth: JWT + bcrypt
+- Validation: express-validator
+- Logging: Pino, Morgan
+
+**Key features**
+
+- JWT auth with refresh tokens and revocation
+- User profiles with password change and soft-delete
+- Group management, role-based access, and invite links
+- Expense creation (equal, percentage, custom splits)
+- CSV/TSV bulk import for expenses
+- Settlement planning + idempotent execution
+- PDF export for settlement reports
+- In-app notifications with optional SMTP delivery
+- Redis caching for balances and settlement plans
+
+**Architecture (high level)**
+
+- `src/` — app bootstrap and server startup
+- `db/` — schema, migrations, seeds, DB + Redis helpers
+- `modules/` — domain modules (auth, users, groups, expenses, settlements, notifications)
+- `frontend/` — demo UI and browser API calls
+- `public/`, `views/` — demo assets and EJS pages
 
 Request flow:
 
-`UI or API client -> Express route -> validation -> controller -> service -> PostgreSQL / Redis -> response`
+UI or API client -> Express route -> validation -> controller -> service -> PostgreSQL / Redis -> response
 
-## Tech Stack
+## Quickstart
 
-| Layer         | Technology                  |
-| ------------- | --------------------------- |
-| Runtime       | Node.js                     |
-| Language      | TypeScript                  |
-| Web Framework | Express.js                  |
-| Database      | PostgreSQL                  |
-| Cache         | Redis                       |
-| Views         | EJS                         |
-| Auth          | JWT, bcrypt                 |
-| Validation    | express-validator           |
-| Logging       | Pino, Morgan                |
-| Security      | Helmet, CORS, rate limiting |
-| Testing       | Jest                        |
+Prerequisites:
 
-## Key Capabilities
+- Node.js 20+
+- PostgreSQL 15+
+- Redis 7+
 
-- JWT-based authentication with refresh tokens and logout support
-- User profile management with password change and soft delete
-- Group CRUD, membership management, invite links, and role-based access control
-- Expense creation with equal, percentage, and custom splits
-- Bulk expense import from CSV/TSV-style data
-- Settlement planning and execution with idempotency protection
-- PDF export for settlement reports
-- In-app notifications for invites, expense updates, and settlement reminders
-- Redis caching for frequently used group, balance, and settlement data
-- Centralized validation and consistent API error handling
-- Jest-based unit tests for core service and middleware logic
-
-## Project Structure
-
-```text
-project-root/
-src/                 # App bootstrap and server startup
-db/                  # PostgreSQL schema, seed, and DB/Redis helpers
-modules/             # Auth, users, groups, expenses, settlements, notifications
-shared/              # Shared middleware, errors, and utilities
-frontend/            # Demo UI and browser API clients
-public/              # Browser JavaScript and CSS
-views/               # EJS demo pages and partials
-docs/                # Project detail, OpenAPI, and Postman exports
-test/                # Jest unit tests
-```
-
-## Setup
-
-### Prerequisites
-
-- Node.js 20 or newer
-- PostgreSQL 15 or newer
-- Redis 7 or newer
-
-### Install Dependencies
+Install and run locally:
 
 ```bash
 npm install
-```
-
-### Configure Environment
-
-- Copy `.env.sample` to `.env`
-- Update database, Redis, JWT, and SMTP values
-- Use `DB_URL` for PostgreSQL connection string
-
-### Initialize Database
-
-```bash
+cp .env.sample .env
+# edit .env (DB_URL, REDIS_URL, JWT secrets, SMTP if used)
 npm run db:setup
 npm run db:seed
-```
-
-### Development
-
-```bash
 npm run dev
 ```
 
-### Production
+Build for production:
 
 ```bash
 npm run build
 npm start
 ```
 
-### Tests
+Run tests:
 
 ```bash
 npm test
 ```
 
-## API Summary
+## Environment variables
 
-### Auth
+Copy `.env.sample` to `.env` and set values for:
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout`
-- `POST /api/auth/forgot-password`
-- `POST /api/auth/reset-password`
+- `DB_URL` — PostgreSQL connection string
+- `REDIS_URL` — Redis connection string
+- `JWT_SECRET`, `JWT_REFRESH_SECRET`
+- `SMTP_*` — optional, for email notifications
 
-### Users
+## API summary
 
-- `GET /api/users/me`
-- `PUT /api/users/me`
-- `POST /api/users/me/change-password`
-- `DELETE /api/users/me`
+The app exposes a REST API. Common endpoints:
 
-### Groups
+- Auth: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`
+- Users: `GET /api/users/me`, `PUT /api/users/me`, `POST /api/users/me/change-password`, `DELETE /api/users/me`
+- Groups: CRUD + `GET /api/groups/:groupId/balances`, invite routes
+- Expenses: `POST /api/expenses`, `GET /api/expenses`, `GET /api/expenses/:expenseId`, `PUT`, `DELETE`
+- Settlements: `GET /api/settlements/plan/:groupId`, `POST /api/settlements/execute`, history & export
+- Notifications: read/unread endpoints
 
-- `GET /api/groups`
-- `POST /api/groups`
-- `GET /api/groups/:groupId`
-- `PUT /api/groups/:groupId`
-- `DELETE /api/groups/:groupId`
-- `GET /api/groups/:groupId/balances`
-- `GET /api/groups/:groupId/invite`
-- `GET /api/groups/join/:token`
-- `POST /api/groups/:groupId/members`
-- `DELETE /api/groups/:groupId/members/:userId`
-
-### Expenses
-
-- `POST /api/expenses`
-- `GET /api/expenses`
-- `GET /api/expenses/:expenseId`
-- `PUT /api/expenses/:expenseId`
-- `DELETE /api/expenses/:expenseId`
-
-### Settlements
-
-- `GET /api/settlements/plan/:groupId`
-- `POST /api/settlements/execute`
-- `GET /api/settlements/history/:groupId`
-- `PATCH /api/settlements/:settlementId/cancel`
-- `GET /api/settlements/:groupId/export/pdf`
-
-### Notifications
-
-- `GET /api/notifications`
-- `GET /api/notifications/unread-count`
-- `PATCH /api/notifications/read-all`
-- `PATCH /api/notifications/:notificationId/read`
-
-## Demo Pages
-
-- `/login`
-- `/dashboard`
-- `/groups`
-- `/groups/create`
-- `/groups/:id`
-- `/balances`
-- `/history`
-- `/settlements`
-- `/settlements/:groupId`
-- `/notifications`
-- `/profile`
-- `/join/:token`
-- `/reset-password`
-
-## Security
-
-- Passwords are hashed with bcrypt
-- Auth uses JWT access and refresh tokens
-- Refresh tokens are stored server-side for revocation
-- Sensitive routes use authentication middleware
-- Group actions enforce role-based access control
-- Requests are validated with express-validator
-- SQL queries use parameterized statements
-- Rate limiting and Helmet reduce common abuse vectors
-
-## Performance and Reliability
-
-- Redis caches group summaries, balances, and settlement plans
-- Settlement calculation uses a greedy heap-based algorithm with `O(n log n)` complexity
-- Balance calculations ignore tiny floating-point noise with epsilon handling
-- Database writes use transactions where needed
-- Soft deletes preserve history and avoid destructive loss
+See `docs/openapi.yaml` for a full API spec.
 
 ## Testing
 
-The current test suite is focused on mocked unit tests:
+- Jest unit tests for core services and middleware
+- Tests run without touching the production database (mocked)
 
-- Auth service tests
-- User service tests
-- Group service tests
-- Expense service tests
-- Import service tests
-- Notification service tests
-- PDF builder tests
-- Middleware tests
+```bash
+npm test
+```
 
-Current status:
+## Contributing
 
-- 46 passing Jest tests
-- 8 passing test suites
-- No database writes during test execution
+- Follow conventional commits for PRs
+- Run unit tests and linters before submitting
+- Add unit tests for any new business logic
 
-## Documentation
+## Useful files
 
-- Project detail: [docs/project-detail.md](docs/project-detail.md)
-- Swagger/OpenAPI: [docs/openapi.yaml](docs/openapi.yaml)
-- Postman collection: [postman/SplitMate.postman_collection.json](postman/SplitMate.postman_collection.json)
+- [docs/project-detail.md](docs/project-detail.md)
+- [docs/openapi.yaml](docs/openapi.yaml)
+- [postman/SplitMate.postman_collection.json](postman/SplitMate.postman_collection.json)
 
-## Known Limitations
+## License
 
-- Spreadsheet-native `.xlsx` upload support can still be added later
-- Notification delivery is currently in-app plus SMTP when configured
-- Frontend is intentionally minimal and focused on demonstrating API flows
+This project uses the license in the repository root. Update `LICENSE` as needed.
 
-## Notes
+---
 
-- The demo UI is designed to be functional rather than feature-complete
-- The app is backend-first and API-driven
-- The source tree is organized for incremental growth without changing the main stack
+If you'd like, I can:
+
+- add badges (build, coverage)
+- create a short `CONTRIBUTING.md`
+- generate a one-page API usage example for the frontend demo
+
+Tell me which of the above you'd like next.
