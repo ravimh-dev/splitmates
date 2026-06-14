@@ -15,10 +15,11 @@ Expense Splitter is a backend-first shared-expenses platform for groups that nee
 The application follows a modular monolith design:
 
 - `src/app.ts` configures Express, security middleware, static assets, routes, and error handling
-- `src/server.ts` connects PostgreSQL and Redis before starting the server
-- `modules/` contains controller, service, validation, route, and type files for each domain, including auth, user, groups, expenses, settlements, and notifications
+- `src/server.ts` (if present) connects PostgreSQL and Redis before starting the server
+- `modules/` contains controller, service, validation, route, and type files for each domain, including auth, users, groups, expenses, and settlements
 - `db/` contains the connection layer, schema setup, and seed data
-- `public/js/` contains browser-side API calls and page behavior
+- `frontend/` contains the demo UI, browser-side API calls and assets
+- `public/` contains static assets served by Express for the demo UI
 - `views/` contains EJS pages for the demo UI
 
 Request flow:
@@ -61,13 +62,13 @@ Request flow:
 project-root/
 src/                 # App bootstrap and server startup
 db/                  # PostgreSQL schema, seed, and DB/Redis helpers
-modules/             # Auth, user, groups, expenses, settlements, notifications
-middlewares/         # Auth and error handling
-utils/               # Shared constants and response helpers
-views/               # EJS demo pages and partials
+modules/             # Auth, users, groups, expenses, settlements, notifications
+shared/              # Shared middleware, errors, and utilities
+frontend/            # Demo UI and browser API clients
 public/              # Browser JavaScript and CSS
+views/               # EJS demo pages and partials
 docs/                # Project detail, OpenAPI, and Postman exports
-src/test/            # Jest unit tests
+test/                # Jest unit tests
 ```
 
 ## Setup
@@ -228,7 +229,7 @@ Current status:
 
 - Project detail: [docs/project-detail.md](docs/project-detail.md)
 - Swagger/OpenAPI: [docs/openapi.yaml](docs/openapi.yaml)
-- Postman collection: [docs/postman_collection.json](docs/postman_collection.json)
+- Postman collection: [postman/SplitMate.postman_collection.json](postman/SplitMate.postman_collection.json)
 
 ## Known Limitations
 

@@ -1,156 +1,102 @@
 import "dotenv/config";
-import "express-async-errors";
-import express, { Application } from "express";
-import path from "path";
-import helmet from "helmet";
+import express from "express";
 import cors from "cors";
-import compression from "compression";
-import cookieParser from "cookie-parser";
-import morgan from "morgan";
-import rateLimit from "express-rate-limit";
+import { json } from "body-parser";
+import { Pool } from "pg";
 
-import authRouter from "../modules/auth/auth.route";
-import userRouter from "../modules/user/user.route";
-import groupRouter from "../modules/groups/groups.route";
-import expenseRouter from "../modules/expenses/expenses.route";
-import settlementRouter from "../modules/settlements/settlements.route";
-import notificationRouter from "../modules/notifications/notifications.route";
+import { errorHandler } from "./shared/errors/errorHandler";
 
-import { notFound, errorHandler } from "../middlewares/error.middleware";
+import authRoutes from "./modules/auth/auth.route";
+import usersRoutes from "./modules/users/users.route";
+import groupsRoutes from "./modules/groups/groups.route";
+import expensesRoutes from "./modules/expenses/expenses.route";
+import balancesRoutes from "./modules/balances/balances.route";
+import settlementsRoutes from "./modules/settlements/settlements.route";
+import activitiesRoutes from "./modules/activities/activities.route";
 
-const app: Application = express();
+const app = express();
+const PORT = Number(process.env.PORT) || 3001;
 
-// ─── Security ─────────────────────────────────────────────────────────────────
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "fonts.googleapis.com",
-          "cdnjs.cloudflare.com",
-        ],
-        fontSrc: ["'self'", "fonts.gstatic.com"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https:"],
-      },
-    },
-  }),
-);
+/* -------------------- PostgreSQL -------------------- */
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+/* -------------------- Middlewares -------------------- */
+const allowedOrigins = [
+  process.env.CLIENT_URL_DEV,
+  process.env.CLIENT_URL_PROD,
+].filter(Boolean) as string[];
 
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "*",
-    credentials: true,
-  }),
+    origin:
+      allowedOrigins.length > 0
+        ? allowedOrigins
+        : "http://localhost:3002",
+  })
 );
 
-// ─── Rate limiting ────────────────────────────────────────────────────────────
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000"),
-  max: parseInt(process.env.RATE_LIMIT_MAX || "100"),
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Too many requests, please try again later",
-  },
+app.use(json());
+
+/* -------------------- REQUEST LOGGER -------------------- */
+app.use((req, res, next) => {
+  console.log(`➡️ ${req.method} ${req.originalUrl}`);
+  next();
 });
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: {
-    success: false,
-    message: "Too many auth attempts, please try again later",
-  },
+/* -------------------- HEALTH CHECK -------------------- */
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    message: "SplitMate API is running 🚀",
+    time: new Date().toISOString(),
+  });
 });
 
-app.use("/api", limiter);
-app.use("/api/auth", authLimiter);
+/* -------------------- ROUTES -------------------- */
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", usersRoutes);
+app.use("/api/v1/groups", groupsRoutes);
+app.use("/api/v1/expenses", expensesRoutes);
+app.use("/api/v1/balances", balancesRoutes);
+app.use("/api/v1/settlements", settlementsRoutes);
+app.use("/api/v1/activities", activitiesRoutes);
 
-// ─── Parsers ──────────────────────────────────────────────────────────────────
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(cookieParser());
-app.use(compression());
-
-// ─── Logging ──────────────────────────────────────────────────────────────────
-if (process.env.NODE_ENV !== "test") {
-  app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
-}
-
-// ─── View engine (EJS) ────────────────────────────────────────────────────────
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "..", "views"));
-app.use(express.static(path.join(__dirname, "..", "public")));
-
-// ─── API routes ───────────────────────────────────────────────────────────────
-app.use("/api/auth", authRouter);
-app.use("/api/users", userRouter);
-app.use("/api/groups", groupRouter);
-app.use("/api/expenses", expenseRouter);
-app.use("/api/settlements", settlementRouter);
-app.use("/api/notifications", notificationRouter);
-
-// ─── EJS view routes ─────────────────────────────────────────────────────────
-app.get("/", (_req, res) => res.redirect("/login"));
-app.get("/login", (_req, res) => res.render("pages/login", { title: "Login" }));
-app.get("/dashboard", (_req, res) =>
-  res.render("pages/dashboard", { title: "Dashboard" }),
-);
-app.get("/profile", (_req, res) =>
-  res.render("pages/profile", { title: "Profile" }),
-);
-app.get("/groups", (_req, res) =>
-  res.render("pages/groups", { title: "Groups" }),
-);
-app.get("/balances", (_req, res) =>
-  res.render("pages/balances", { title: "Balances" }),
-);
-app.get("/history", (_req, res) =>
-  res.render("pages/history", { title: "History" }),
-);
-app.get("/settlements", (_req, res) =>
-  res.render("pages/settlement", { title: "Settlements", groupId: "" }),
-);
-app.get("/groups/create", (_req, res) =>
-  res.render("pages/create-group", { title: "Create Group" }),
-);
-app.get("/expenses", (_req, res) =>
-  res.render("pages/expense", { title: "Expenses" }),
-);
-app.get("/notifications", (_req, res) =>
-  res.render("pages/notifications", { title: "Notifications" }),
-);
-app.get("/groups/:id", (_req, res) =>
-  res.render("pages/group", { title: "Group", groupId: _req.params.id }),
-);
-app.get("/settlements/:groupId", (_req, res) =>
-  res.render("pages/settlement", {
-    title: "Settlements",
-    groupId: _req.params.groupId,
-  }),
-);
-app.get("/join/:token", (_req, res) =>
-  res.render("pages/join", {
-    title: "Join Group",
-    inviteToken: _req.params.token,
-  }),
-);
-app.get("/reset-password", (_req, res) =>
-  res.render("pages/reset-password", { title: "Reset Password" }),
-);
-
-// ─── Health check ─────────────────────────────────────────────────────────────
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-// ─── Error handlers ───────────────────────────────────────────────────────────
-app.use(notFound);
+/* -------------------- ERROR HANDLER -------------------- */
 app.use(errorHandler);
+
+/* -------------------- START SERVER -------------------- */
+const startServer = async () => {
+  try {
+    console.log("⏳ Connecting to PostgreSQL...");
+
+    await pool.query("SELECT 1");
+
+    console.log("✅ PostgreSQL connected successfully");
+    console.log("📦 Database ready: splitmates");
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log("🚀 Server starting...");
+      console.log(`🌐 Port: ${PORT}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+      console.log("🔥 API is LIVE and ready");
+    });
+  } catch (error) {
+    console.error("❌ Failed to connect to PostgreSQL:", error);
+    process.exit(1);
+  }
+};
+
+/* -------------------- GLOBAL ERROR HANDLERS -------------------- */
+process.on("uncaughtException", (err) => {
+  console.error("💥 Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("💥 Unhandled Rejection:", err);
+});
+
+startServer();
 
 export default app;

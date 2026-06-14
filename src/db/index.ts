@@ -1,43 +1,42 @@
-import { Pool } from 'pg';
-import dotenv from 'dotenv';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from "pg";
 
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-
-dotenv.config();
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
-
-pool.on('connect', () => {
-  console.log('[DB] Connected to PostgreSQL');
-});
-
-pool.on('error', (err: Error) => {
-  console.error('[DB] Unexpected error on idle client', err);
-  process.exit(-1);
-});
-
-
-/**
- * Standard query helper using the pool
- */
-export const query = (text: string, params?: any[]) => {
-  return pool.query(text, params);
+export const query = async <T extends QueryResultRow = any>(
+  text: string,
+  params?: any[],
+): Promise<QueryResult<T>> => {
+  return pool.query<T>(text, params);
 };
 
-/**
- * Client helper for transactions
- */
-export const clientQuery = async () => {
+export const queryWithClient = async <T extends QueryResultRow = any>(
+  client: PoolClient,
+  text: string,
+  params?: any[],
+): Promise<QueryResult<T>> => {
+  return client.query<T>(text, params);
+};
+
+export const startTransaction = async (): Promise<{ client: PoolClient }> => {
   const client = await pool.connect();
-  return client;
+  await client.query("BEGIN");
+  return { client };
 };
 
+export const commitTransaction = async (client: PoolClient) => {
+  try {
+    await client.query("COMMIT");
+  } finally {
+    client.release();
+  }
+};
+
+export const rollbackTransaction = async (client: PoolClient) => {
+  try {
+    await client.query("ROLLBACK");
+  } finally {
+    client.release();
+  }
+};
 
 export default pool;
-
-
